@@ -1,5 +1,6 @@
 const merge = require('webpack-merge').smart;
 const common = require('./webpack.common.js');
+const path = require('path');
 
 const devModeConfig = {
     mode: 'development',
@@ -8,7 +9,7 @@ const devModeConfig = {
         removeAvailableModules: false,
         removeEmptyChunks: false,
         splitChunks: false,
-    }
+    }    
 }
 
 module.exports = [

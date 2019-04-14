@@ -10,6 +10,8 @@ const externals = [
    'mocha',
    'chai',
    'sinon',
+   'istanbul',
+   'remap-istanbul',
    // VSCode is an external that we do not want to package
    'vscode', 
    'vscode-languageclient'
@@ -110,6 +112,20 @@ const tests = {
     output: {
         libraryTarget: 'commonjs2',
         path: path.resolve(__dirname, 'out', 'test')
+    },
+    module: {
+        rules: [
+            {
+                test: /\.ts$/,
+                enforce: 'post', 
+                exclude: [/node_modules/, path.resolve(__dirname, 'src', 'test')],
+                loader: 'istanbul-instrumenter-loader',
+                options: { 
+                    esModules: true,
+                    debug: true
+                }
+            }
+        ]
     }
 };
 
