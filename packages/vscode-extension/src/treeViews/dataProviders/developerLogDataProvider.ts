@@ -27,6 +27,9 @@ export class DeveloperLogDataProvider extends TreeDataProvider<DeveloperLog> imp
     private autoRefreshEnabled: boolean = false;
     private currentUserOnly: boolean = false;
     private readonly autoRefreshInterval: number = 3000;
+    private searchFilter: string | undefined;
+    private filteredLogs: Array<DeveloperLog> | undefined;
+    private treeViewHost?: TreeViewHost<DeveloperLog>;
 
     constructor(service: VlocodeService, private readonly logger: Logger) {
         super(service);
@@ -61,9 +64,10 @@ export class DeveloperLogDataProvider extends TreeDataProvider<DeveloperLog> imp
     }
 
     public createTreeViewHost(viewId: string): TreeViewHost<DeveloperLog> {
-        return new TreeViewHost(viewId, this, {
+        this.treeViewHost = new TreeViewHost(viewId, this, {
             onDidChangeVisibility: event => this.onDidChangeVisibility(event)
         });
+        return this.treeViewHost;
     }
 
     protected getCommands() {
@@ -79,7 +83,11 @@ export class DeveloperLogDataProvider extends TreeDataProvider<DeveloperLog> imp
                 await this.executeCommand(VlocodeCommand.clearDeveloperLogs);
                 this.logs.splice(0);
                 this.refresh();
-            }
+            },
+            'vlocode.developerLogs.search': async () => {
+                await this.promptSearch();
+            },
+            'vlocode.developerLogs.clearSearch': () => this.clearSearch(),
         };
     }
 
@@ -176,6 +184,10 @@ export class DeveloperLogDataProvider extends TreeDataProvider<DeveloperLog> imp
             return;
         }
 
+        if (this.filteredLogs) {
+            return this.filteredLogs;
+        }
+
         if (this.lastRefresh && (Date.now() - this.lastRefresh.getTime()) < 500)  {
             // avoid refreshing if we just had a refresh
             return this.logs;
@@ -183,6 +195,72 @@ export class DeveloperLogDataProvider extends TreeDataProvider<DeveloperLog> imp
 
         await this.refreshLogs();
         return this.logs;
+    }
+
+    private async promptSearch() {
+        const query = await vscode.window.showInputBox({
+            prompt: 'Search developer logs',
+            placeHolder: 'Enter text to search in log content...',
+            value: this.searchFilter,
+        });
+
+        if (query === undefined) {
+            return;
+        }
+
+        if (!query.trim()) {
+            this.clearSearch();
+            return;
+        }
+
+        await this.searchLogs(query.trim());
+    }
+
+    private async searchLogs(query: string) {
+        this.searchFilter = query;
+
+        const matches = await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: `Searching logs for "${query}"...`,
+            cancellable: false,
+        }, () => this.applySearchFilter(query));
+
+        if (this.searchFilter === query) {
+            this.setFilteredLogs(query, matches);
+            this.refresh();
+        }
+    }
+
+    private async applySearchFilter(query: string): Promise<DeveloperLog[]> {
+        const results = await Promise.all(
+            this.logs.map(async log => {
+                try {
+                    const body = await log.getBody();
+                    return body.includes(query) ? log : undefined;
+                } catch {
+                    return undefined;
+                }
+            })
+        );
+        return results.filter((log): log is DeveloperLog => log !== undefined);
+    }
+
+    private setFilteredLogs(query: string, matches: DeveloperLog[]) {
+        this.filteredLogs = matches;
+        void vscode.commands.executeCommand('setContext', 'vlocode:developerLogsSearchActive', true);
+        if (this.treeViewHost) {
+            this.treeViewHost.message = `${matches.length} of ${this.logs.length} logs match "${query}"`;
+        }
+    }
+
+    public clearSearch() {
+        this.searchFilter = undefined;
+        this.filteredLogs = undefined;
+        void vscode.commands.executeCommand('setContext', 'vlocode:developerLogsSearchActive', false);
+        if (this.treeViewHost) {
+            this.treeViewHost.message = undefined;
+        }
+        this.refresh();
     }
 
     /**
@@ -214,6 +292,14 @@ export class DeveloperLogDataProvider extends TreeDataProvider<DeveloperLog> imp
         }
 
         this.logs = newLogs;
+
+        if (this.searchFilter) {
+            const activeQuery = this.searchFilter;
+            const matches = await this.applySearchFilter(activeQuery);
+            if (this.searchFilter === activeQuery) {
+                this.setFilteredLogs(activeQuery, matches);
+            }
+        }
 
         if (options?.refreshView) {
             this.refresh();

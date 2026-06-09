@@ -74,6 +74,12 @@ export class TreeViewHost<T> implements vscode.TreeDataProvider<T>, vscode.Dispo
         return this;
     }
 
+    public set message(value: string | undefined) {
+        if (this.treeView) {
+            this.treeView.message = value;
+        }
+    }
+
     public onDidChangeVisibility(listener: (event: vscode.TreeViewVisibilityChangeEvent) => unknown): vscode.Disposable {
         if (!this.treeView) {
             throw new Error(`TreeView ${this.viewId} has not been registered`);

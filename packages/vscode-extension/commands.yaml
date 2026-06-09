@@ -338,6 +338,20 @@ vlocode.developerLogs.setLogVisibility:
   menus:
     - menu: view/title
       group: navigation
+vlocode.developerLogs.search:
+  title: Search Logs
+  icon: $(search)
+  when: view == developerLogsView
+  menus:
+    - menu: view/title
+      group: navigation
+vlocode.developerLogs.clearSearch:
+  title: Clear Search
+  icon: resources/{type}/close.svg
+  when: 'view == developerLogsView && vlocode:developerLogsSearchActive'
+  menus:
+    - menu: view/title
+      group: navigation
 
 # OmniScript LWC commands
 vlocode.omniScript.generateLwc:
