@@ -43,7 +43,7 @@ export class DeveloperLogDataProvider extends TreeDataProvider<DeveloperLog> imp
     private registerConfigListener() {
         this.vlocode.onUsernameChanged(username => {
             this.lastRefresh = undefined;
-            this.logs.splice(0);
+            this.clearLogs({ clearSearch: true });
             this.refresh();
             if (username) {
                 void this.refreshLogs({ refreshView: true });
@@ -58,7 +58,7 @@ export class DeveloperLogDataProvider extends TreeDataProvider<DeveloperLog> imp
         ConfigurationManager.onConfigChange(this.vlocode.config.salesforce, [ 'developerLogsVisibility' ], config => {
             this.currentUserOnly = config.developerLogsVisibility != 'all';
             this.lastRefresh = undefined;
-            this.logs.splice(0);
+            this.clearLogs();
             this.refresh();
         }, { initial: true });
     }
@@ -81,7 +81,7 @@ export class DeveloperLogDataProvider extends TreeDataProvider<DeveloperLog> imp
             },
             'vlocode.developerLogs.deleteAll': async () => {
                 await this.executeCommand(VlocodeCommand.clearDeveloperLogs);
-                this.logs.splice(0);
+                this.clearLogs();
                 this.refresh();
             },
             'vlocode.developerLogs.search': async () => {
@@ -250,6 +250,15 @@ export class DeveloperLogDataProvider extends TreeDataProvider<DeveloperLog> imp
         void vscode.commands.executeCommand('setContext', 'vlocode:developerLogsSearchActive', true);
         if (this.treeViewHost) {
             this.treeViewHost.message = `${matches.length} of ${this.logs.length} logs match "${query}"`;
+        }
+    }
+
+    private clearLogs(options?: { clearSearch?: boolean }) {
+        this.logs.splice(0);
+        if (options?.clearSearch) {
+            this.clearSearch();
+        } else if (this.searchFilter) {
+            this.setFilteredLogs(this.searchFilter, []);
         }
     }
 
